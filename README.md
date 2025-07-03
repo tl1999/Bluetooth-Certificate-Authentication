@@ -98,7 +98,7 @@ Depending on which role the device should take on be in the correct folder.
   ./Connection_Central <Peripheral address> <0 or 1>
 ```
    
-  --> The user can choose between the different approaches used for the schemes (Using Signature KeyPairs or using a Diffie–Hellman approach). O is for the signature approach, while 1 is for the DH approach. The differences are more deeply expounded on in the thesis. The Peripheral address has to be the Bluetooth MAC address of the Peripheral device in the format (00:11:22:33:44:55)  
+  --> The user can choose between the different approaches used for the schemes (Using Signature KeyPairs or using a Diffie–Hellman approach). 0 is for the signature approach, while 1 is for the DH approach. The differences are more deeply expounded on in the thesis. The Peripheral address has to be the Bluetooth MAC address of the Peripheral device in the format (00:11:22:33:44:55)  
 
 ## Settings
 If the storage location of a file or the name, e.g. certificate or key, has changed, there is the option in each program to change the location or the name of the file to be used. Additionally, it can be the case that the storage location of the Bluetooth data is changed. Therefore, users also have the option to change the location. 
