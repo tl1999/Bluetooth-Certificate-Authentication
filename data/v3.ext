@@ -1,0 +1,8 @@
+authorityKeyIdentifier = keyid,issuer
+subjectKeyIdentifier = hash
+basicConstraints = critical, CA:FALSE
+keyUsage = critical, digitalSignature
+subjectAltName = @alt_name
+
+[alt_name]
+DNS.1 = DCA6321DAE54.com
