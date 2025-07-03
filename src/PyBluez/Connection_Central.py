@@ -1,5 +1,7 @@
 import datetime
 import os
+import fileinput
+import re
 import subprocess
 import time
 import threading
@@ -13,8 +15,7 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
 from cryptography.x509.verification import PolicyBuilder, Store
 import click
-import fileinput
-import re
+
 
 BLUETOOTH_PARAMETERS_PATH_LINUX = "/var/lib/bluetooth/"
 
@@ -31,9 +32,114 @@ ECDH_CERT_FILE = "cert_DH.crt"
 DEFAULT_BDADDR = "DC:A6:32:1D:AE:54"
 
 USE_CONNECTION_VALUES = False
-BOTH_SYSTEMS = True 
+USE_SYSTEM = 'LE'  # 'BR' or 'LE'
+BOTH_SYSTEMS = False 
 
 valid = False
+
+values = [None]*6
+
+def get_IOcap(values):
+    try:
+        btmon_process = subprocess.Popen(
+                ["btmon"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+            )
+        response = False 
+        io_cap = 0x00
+        oob = 0x00
+        auth = 0x00           
+        for line in btmon_process.stdout:
+            if "IO Capability Request" in line:
+                response = True
+            if "IO capability" in line and response:
+                print("[btmon] Found IO Capability!")
+                match = re.search(r"0x([0-9A-Fa-f]+)", line)
+                if match: 
+                    io_cap = match.group(0)
+                    print(io_cap) 
+            if "OOB data" in line and response:
+                print("[btmon] Found OOB data!")
+                match = re.search(r"0x([0-9A-Fa-f]+)", line)
+                if match: 
+                    obb = match.group(0)
+                    print(obb) 
+            if "Authentication" in line and response:
+                print("[btmon] Found Authentication data!")
+                match = re.search(r"0x([0-9A-Fa-f]+)", line)
+                if match: 
+                    auth = match.group(0)
+                    print(auth) 
+                response = False
+    except Exception as e:
+        print(f"Error while monitoring btmon: {e}")
+    finally:
+        # Ensure btmon is terminated
+        btmon_process.terminate()
+        print("btmon process terminated")
+        return io_cap, oob, auth
+        
+def get_PairingRequest(values):
+    try:
+        btmon_process = subprocess.Popen(
+                ["btmon"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+            )
+        response = False 
+        io_cap = 0x00
+        oob = 0x00
+        auth = 0x00   
+        maxE = 0x00 
+        iKeyDistr = 0x00
+        rKeyDistr = 0x00
+        for line in btmon_process.stdout:
+            if "SMP: Pairing Request" in line:
+                response = True
+            if "IO capability" in line and response:
+                print("[btmon] Found IO Capability!")
+                match = re.search(r"0x([0-9A-Fa-f]+)", line)
+                if match: 
+                    io_cap = match.group(0)
+                    print(io_cap) 
+                    values[0] = io_cap
+            if "OOB data" in line and response:
+                print("[btmon] Found OOB data!")
+                match = re.search(r"0x([0-9A-Fa-f]+)", line)
+                if match: 
+                    oob = match.group(0)
+                    print(oob) 
+                    values[1] = oob
+            if "Authentication requirement" in line and response:
+                print("[btmon] Found Authentication data!")
+                match = re.search(r"0x([0-9A-Fa-f]+)", line)
+                if match: 
+                    auth = match.group(0)
+                    print(auth) 
+                    values[2] = auth
+            if "Max encryption" in line and response:
+                print("[btmon] Found Max encryption!")
+                maxE = hex(int(line.split(":")[1]))
+                print(maxE)
+                values[3] = maxE
+            if "Initiator key distribution" in line and response:
+                print("[btmon] Found Initiator key distribution data!")
+                match = re.search(r"0x([0-9A-Fa-f]+)", line)
+                if match: 
+                    iKeyDistr = match.group(0)
+                    print(iKeyDistr)
+                    values[4] = iKeyDistr
+            if "Responder key distribution" in line and response:
+                print("[btmon] Found Responder  key distribution data!")
+                match = re.search(r"0x([0-9A-Fa-f]+)", line)
+                if match: 
+                    rKeyDistr = match.group(0)
+                    print(rKeyDistr)
+                    values[5] = rKeyDistr
+                response = False
+    except Exception as e:
+        print(f"Error while monitoring btmon: {e}")
+    finally:
+        # Ensure btmon is terminated
+        btmon_process.terminate()
+        print("btmon process terminated")
     
 def is_device_paired(device_address):
     """Check if the device is already paired."""
@@ -76,28 +182,6 @@ def connect(remote_addr):
         text=True
     )
 
-    # process.stdin.write("menu scan\n")
-    # process.stdin.flush()
-
-    # process.stdin.write("clear all\n")
-    # process.stdin.flush()
-
-    # process.stdin.write("rssi -60\n")
-    # process.stdin.flush()
-
-    # process.stdin.write("back\n")
-    # process.stdin.flush()
-
-    # process.stdin.write("discoverable on\n")
-    # process.stdin.flush()
-
-    # Run 'scan on' and wait for the device to appear
-
-    # process.stdin.write("agent NoInputNoOutput\n")
-    # process.stdin.write("default-agent\n")
-    # process.stdin.write("power on\n")
-    # process.stdin.flush()
-
     time.sleep(2)
     
     print(f"Scanning for device {remote_addr}...")
@@ -105,13 +189,9 @@ def connect(remote_addr):
     process.stdin.flush()
 
     # Run 'pair' command for the specified device
-    print("Waiting for device to appear...")
     while True:
-        print("Scanning...")
         line = process.stdout.readline()
-        print(line.strip())
         if not line:
-            print("No output from bluetoothctl.")
             continue
         if "Device" in line and remote_addr in line and "DEL" not in line:
             print(f"Found device: {line.strip()}")
@@ -120,26 +200,6 @@ def connect(remote_addr):
     print(f"Attempting to pair with {remote_addr}...")
     process.stdin.write(f"pair {remote_addr}\n")
     process.stdin.flush()
-    
-    # if access is requested by the device, user has to accept it
-    # print("Waiting for user confirmation...")
-    # while True:
-    #     line = process.stdout.readline()
-    #     print(line.strip())
-    #     if not line:
-    #         break
-    #     if "(yes/no)" in line:
-    #         print("Device requested access")
-    #         answer = input("Accept connection? (yes/no): ").strip().lower()
-    #         process.stdin.write(answer + "\n")
-    #         process.stdin.flush()
-    #         break
-
-    # print("Waiting for pairing confirmation...")
-
-    # # Accept connection
-    # process.stdin.write("yes\n")
-    # process.stdin.flush()
 
     # Run 'scan off' to stop scanning
     process.stdin.write("scan off\n")
@@ -315,7 +375,7 @@ def scheme_BLE_Signature_verify(sock, remote_addr):
     sock.send(b'1')
 
     try:
-        scheme_BLE_Signature_authenticate(sock, remote_addr, PairReq)
+        scheme_BLE_Signature_authenticate(sock, remote_addr)
     except Exception as e:
         print(f"Error during authentication: {e}")
         raise
@@ -381,7 +441,7 @@ def scheme_BLE_DH_verify(sock, remote_addr):
     sock.send(b'1')
 
     try:
-        scheme_BLE_DH_authenticate(sock, remote_addr, PairReq)
+        scheme_BLE_DH_authenticate(sock, remote_addr)
     except Exception as e:
         print(f"Error during authentication: {e}")
         raise
@@ -432,7 +492,7 @@ def scheme_BR_Signature_verify(sock, remote_addr):
     
     sock.send(b'1')
     try:
-        scheme_BR_Signature_authenticate(sock, remote_addr, IOcap)
+        scheme_BR_Signature_authenticate(sock, remote_addr)
     except Exception as e:
         print(f"Error during authentication: {e}")
         raise
@@ -494,7 +554,7 @@ def scheme_BR_DH_verify(sock, remote_addr):
     
     sock.send(b'1')
     try:
-        scheme_BR_DH_authenticate(sock, remote_addr, IOCap)
+        scheme_BR_DH_authenticate(sock, remote_addr)
     except Exception as e:
         print(f"Error during authentication: {e}")
         raise
@@ -502,7 +562,7 @@ def scheme_BR_DH_verify(sock, remote_addr):
     return
 
 
-def scheme_BLE_Signature_authenticate(sock, remote_addr, PairReq):
+def scheme_BLE_Signature_authenticate(sock, remote_addr):
 
     # Response
     challA = sock.recv(16)
@@ -523,6 +583,18 @@ def scheme_BLE_Signature_authenticate(sock, remote_addr, PairReq):
         nonce = os.urandom(16)
     encryptor = Cipher(algorithms.AES(ltk), modes.CTR(nonce)).encryptor()
     authData = encryptor.update(challB) + encryptor.finalize()
+
+    if USE_CONNECTION_VALUES:
+        io_cap = int(values[0], 16)
+        oob = int(values[1], 16)
+        auth = int(values[2], 16)
+        maxE = int(values[3], 16)
+        iKeyDistr = int(values[4], 16)
+        rKeyDistr = int(values[5], 16)
+
+        PairReq = bytes([io_cap, oob, auth, maxE, iKeyDistr, rKeyDistr])
+    else:
+        PairReq = b'0'*6
 
     # sign message with private key
     message = authData + challA + challB + PairReq
@@ -547,7 +619,7 @@ def scheme_BLE_Signature_authenticate(sock, remote_addr, PairReq):
     
     return
 
-def scheme_BLE_DH_authenticate(sock, remote_addr, PairReq):
+def scheme_BLE_DH_authenticate(sock, remote_addr):
 
     # Exchange ECDH keys
     with open(ECDH_KEY_FILE, "rb") as key_file:
@@ -575,6 +647,18 @@ def scheme_BLE_DH_authenticate(sock, remote_addr, PairReq):
     i0 = b'0'*3
     a0 = b'0'*len(remote_addr)
 
+    if USE_CONNECTION_VALUES:
+        io_cap = int(values[0], 16)
+        oob = int(values[1], 16)
+        auth = int(values[2], 16)
+        maxE = int(values[3], 16)
+        iKeyDistr = int(values[4], 16)
+        rKeyDistr = int(values[5], 16)
+
+        PairReq = bytes([io_cap, oob, auth, maxE, iKeyDistr, rKeyDistr])
+    else:
+        PairReq = b'0'*6
+
     message = challA + challB + authData + i0 + a0 + PairReq
     c = cmac.CMAC(algorithms.AES(sharedKey))
     c.update(message)
@@ -594,7 +678,7 @@ def scheme_BLE_DH_authenticate(sock, remote_addr, PairReq):
 
     return
 
-def scheme_BR_Signature_authenticate(sock, remote_addr, IOcap):
+def scheme_BR_Signature_authenticate(sock, remote_addr):
     # Start communication and send the chosen scheme
 
     # Respond
@@ -614,6 +698,16 @@ def scheme_BR_Signature_authenticate(sock, remote_addr, IOcap):
     cipher = hmac.HMAC(lk, hashes.SHA256())
     cipher.update(challB + challA)
     authData = cipher.finalize()
+
+    if USE_CONNECTION_VALUES:
+        io_cap = int(values[0], 16)
+        oob = int(values[1], 16)
+        auth = int(values[2], 16)
+
+        IOcap = bytes([io_cap, oob, auth])
+
+    else:
+        IOcap = b'000'
 
     # sign message with private key
     message = authData + IOcap
@@ -636,7 +730,7 @@ def scheme_BR_Signature_authenticate(sock, remote_addr, IOcap):
     sock.send(cert)
     return
 
-def scheme_BR_DH_authenticate(sock, remote_addr, IOcap):
+def scheme_BR_DH_authenticate(sock, remote_addr):
 
     # Exchange ECDH keys
     with open(ECDH_KEY_FILE, "rb") as key_file:
@@ -657,6 +751,16 @@ def scheme_BR_DH_authenticate(sock, remote_addr, IOcap):
     cipher = hmac.HMAC(lk, hashes.SHA256())
     cipher.update(challA + challB)
     authData = cipher.finalize()
+
+    if USE_CONNECTION_VALUES:
+        io_cap = int(values[0], 16)
+        oob = int(values[1], 16)
+        auth = int(values[2], 16)
+
+        IOcap = bytes([io_cap, oob, auth])
+
+    else:
+        IOcap = b'000'
 
     # HMAC with shared key
     message = challA + challB + authData + IOcap + b'0'*len(remote_addr)*2
@@ -727,7 +831,13 @@ def select_mode(system, scheme, address):
     
     if BOTH_SYSTEMS:
         print("Both systems selected")
+        if USE_CONNECTION_VALUES:
+            thread_target = get_IOcap if USE_SYSTEM == 'BR' else get_PairingRequest
+            btmon_thread = threading.Thread(target=thread_target, daemon=True, args=(values,))
+            btmon_thread.start()
         connect(remote_addr)
+        if USE_CONNECTION_VALUES:
+            btmon_thread.join(timeout=5)
 
 
     try :
