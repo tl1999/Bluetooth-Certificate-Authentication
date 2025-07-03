@@ -25,7 +25,7 @@ ECDH_KEY_FILE = "ecdh_key.pem"
 ECDH_PASSWORD = None
 ECDH_CERT_FILE = "cert_DH.crt"
 
-USE_CONNECTION_VALUES = False
+USE_CONNECTION_VALUES = True
 USE_SYSTEM = 'LE' # BR, LE
 BOTH_SYSTEMS = True # True, False
 
@@ -43,7 +43,7 @@ def get_IOcap(values):
         oob = 0x00
         auth = 0x00           
         for line in btmon_process.stdout:
-            if "IO Capability Response" in line:
+            if "IO Capability Request" in line:
                 response = True
             if "IO capability" in line and response:
                 print("[btmon] Found IO Capability!")
@@ -85,7 +85,7 @@ def get_PairingRequest(values):
         iKeyDistr = 0x00
         rKeyDistr = 0x00
         for line in btmon_process.stdout:
-            if "SMP: Pairing Response" in line:
+            if "SMP: Pairing Request" in line:
                 response = True
             if "IO capability" in line and response:
                 print("[btmon] Found IO Capability!")
