@@ -1,12 +1,12 @@
 # Bluetooth-Certificate-Authentication
 Bluetooth has several security flaws. One major flaw is its susceptibility to Man-in-the-middle attacks due to poor authentication in Bluetooth. As part of a thesis, applications are created and provided in this repository, applying authentication schemes proposed by Fischlin and Sanina [1] on top of Bluetooth to prevent the following types of attacks on Bluetooth's authentication:
 
--Just Works Downgrade attack[2]
--Method Confusion attack[3]
--Pairing Confusion attack[4]
--Ghost Keystroke attack[5]
--Role Confusion attack[6]
--Keysize Confusion attack[7]
+- Just Works Downgrade attack[2]
+- Method Confusion attack[3]
+- Pairing Confusion attack[4]
+- Ghost Keystroke attack[5]
+- Role Confusion attack[6]
+- Keysize Confusion attack[7]
 
 Currently, the applications only support the Bluez Bluetooth stack. Two applications are provided here, supporting each different Bluetooth systems. They are named after the Bluetooth API they use to communicate with the Bluetooth adapter they are using. The PyBluez application supports classic Bluetooth, but is also able to authenticate Bluetooth Low Energy connections if both devices support dual-mode. The BlueR application supports only Low Energy Bluetooth. For each application, two programs have to be executed on the different devices wanting to authenticate a connection. 
 
