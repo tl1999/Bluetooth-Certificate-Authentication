@@ -1,4 +1,6 @@
 # Bluetooth-Certificate-Authentication
+⚠️ This repository contains original academic work. Unauthorised copying, reuse, or reproduction is strictly prohibited. ⚠️
+
 Bluetooth has several security flaws. One major flaw is its susceptibility to Man-in-the-middle attacks due to poor authentication in Bluetooth. As part of a thesis, applications are created and provided in this repository, applying authentication schemes proposed by Fischlin and Sanina [1] on top of Bluetooth to prevent the following types of attacks on Bluetooth's authentication:
 
 - Just Works Downgrade attack[2]
